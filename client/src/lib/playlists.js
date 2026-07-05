@@ -22,6 +22,10 @@ export function getPlaylistById(playlists, id) {
 }
 
 /**
+ * Returns a stable preview list: the first N playlists in server order.
+ * If the selected playlist is outside that window (chosen via the picker),
+ * it replaces the last preview slot without reordering the rest.
+ *
  * @param {{ id: string }[]} playlists
  * @param {string} selectedId
  * @param {number} [limit]
@@ -29,9 +33,14 @@ export function getPlaylistById(playlists, id) {
 export function getPreviewPlaylists(playlists, selectedId, limit = 3) {
   if (playlists.length <= limit) return playlists
 
-  const selected = playlists.find((item) => item.id === selectedId)
-  if (!selected) return playlists.slice(0, limit)
+  const preview = playlists.slice(0, limit)
+  if (!selectedId) return preview
 
-  const others = playlists.filter((item) => item.id !== selectedId)
-  return [selected, ...others].slice(0, limit)
+  const isSelectedInPreview = preview.some((item) => item.id === selectedId)
+  if (isSelectedInPreview) return preview
+
+  const selected = playlists.find((item) => item.id === selectedId)
+  if (!selected) return preview
+
+  return [...preview.slice(0, limit - 1), selected]
 }

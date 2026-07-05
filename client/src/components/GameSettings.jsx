@@ -107,7 +107,7 @@ export function GameSettings({
               className="h-11 rounded-xl border-white/15 bg-white/5 text-zinc-200 hover:bg-white/10"
             >
               <ListMusic className="size-4" />
-              בחר פלייליסט ({playlists.length})
+              בחר פלייליסט
             </Button>
           ) : null}
         </CardContent>
