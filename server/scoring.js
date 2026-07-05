@@ -3,7 +3,16 @@ import levenshtein from 'fast-levenshtein'
 /** @typedef {import('./game.js').Song} Song */
 /** @typedef {import('./rooms.js').Room} Room */
 
-const TEXT_DISTANCE_THRESHOLD = 3
+/**
+ * Allowed Levenshtein errors for a text answer, based on expected answer length.
+ * Uses 50% of length (floored). Answers of 1–2 characters require an exact match
+ * so unrelated one-character-off guesses are not accepted as correct.
+ * @param {number} expectedLength
+ */
+function getAllowedTextErrors(expectedLength) {
+  if (expectedLength <= 2) return 0
+  return Math.floor(expectedLength * 0.5)
+}
 
 /**
  * @param {string | undefined | null} value
@@ -55,17 +64,52 @@ function getCorrectAnswer(song, questionId) {
 
 /**
  * @param {string} answer
+ * @param {string} expected
+ */
+function matchesTextAnswer(answer, expected) {
+  const normalizedAnswer = normalizeText(answer)
+  const normalizedExpected = normalizeText(expected)
+
+  if (!normalizedAnswer) return false
+  if (normalizedAnswer === normalizedExpected) return true
+
+  const distance = levenshtein.get(normalizedAnswer, normalizedExpected)
+  const allowedErrors = getAllowedTextErrors(normalizedExpected.length)
+  return distance <= allowedErrors
+}
+
+/**
+ * Split a multi-artist name into individual artist alternatives (e.g. "A & B").
+ * @param {string} artistName
+ */
+function splitArtistAlternatives(artistName) {
+  return artistName
+    .split(/\s*&\s*|\s+and\s+/i)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+/**
+ * @param {string} answer
  * @param {string} correct
  */
 export function scoreTextAnswer(answer, correct) {
-  const normalizedAnswer = normalizeText(answer)
-  const normalizedCorrect = normalizeText(correct)
+  return matchesTextAnswer(answer, correct) ? 10 : 0
+}
 
-  if (!normalizedAnswer) return 0
-  if (normalizedAnswer === normalizedCorrect) return 10
+/**
+ * Score an artist/creator name. Accepts the full name or any single artist
+ * when the correct answer lists multiple artists (e.g. "Daryl Hall & John Oates").
+ * @param {string} answer
+ * @param {string} correct
+ */
+export function scoreArtistAnswer(answer, correct) {
+  if (matchesTextAnswer(answer, correct)) return 10
 
-  const distance = levenshtein.get(normalizedAnswer, normalizedCorrect)
-  return distance <= TEXT_DISTANCE_THRESHOLD ? 10 : 0
+  const alternatives = splitArtistAlternatives(correct)
+  if (alternatives.length <= 1) return 0
+
+  return alternatives.some((alternative) => matchesTextAnswer(answer, alternative)) ? 10 : 0
 }
 
 /**
@@ -116,7 +160,10 @@ export function calculateRoundScores(room, questions) {
         points = scoreYearAnswer(answer, correctYear)
       } else {
         correctAnswer = getCorrectAnswer(song, question.id)
-        points = scoreTextAnswer(answer, correctAnswer)
+        points =
+          question.id === 'creatorName'
+            ? scoreArtistAnswer(answer, correctAnswer)
+            : scoreTextAnswer(answer, correctAnswer)
       }
 
       questionScores[question.id] = {
