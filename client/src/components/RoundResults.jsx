@@ -1,4 +1,4 @@
-import { ChevronDown, Music2, Trophy } from 'lucide-react'
+import { ChevronDown, Music2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -68,20 +68,6 @@ export function RoundResults({
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="border-purple-500/30 bg-purple-500/10">
-        <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
-          <Trophy className="size-10 text-amber-400" />
-          <div>
-            <p className="text-xl font-semibold text-white">סיבוב {roundNumber} הושלם</p>
-            <p className="mt-2 text-sm text-zinc-400">
-              {isHost
-                ? 'כך צברת בנקודות בסיבוב הזה, ולהלן מצב הנקודות של כל השחקנים. בחר אם לנגן שיר נוסף או לסיים את המשחק.'
-                : 'כך צברת בנקודות בסיבוב הזה, ולהלן מצב הנקודות של כל השחקנים.'}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       {playerResult && (
         <>
           <div className="flex flex-col gap-2">
@@ -150,13 +136,9 @@ export function RoundResults({
 
           <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 px-4 py-4 text-center">
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-              סה״כ סיבוב
+              סה״כ הרווחת בסיבוב זה
             </p>
             <p className="mt-1 text-3xl font-bold text-white" dir="ltr">+{playerResult.roundTotal}</p>
-            <p className="mt-3 text-xs font-medium uppercase tracking-wider text-zinc-400">
-              ציון כולל מעודכן
-            </p>
-            <p className="mt-0.5 text-2xl font-bold text-purple-200" dir="ltr">{playerResult.totalScore}</p>
           </div>
         </>
       )}

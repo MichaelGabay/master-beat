@@ -25,6 +25,9 @@ export function HomeScreen() {
           <h1 className="bg-gradient-to-r from-purple-200 via-pink-200 to-purple-300 bg-clip-text text-4xl font-bold tracking-tight text-transparent">
             Master Beat
           </h1>
+          <p className="mt-3 text-lg text-white/70">
+            זהו מי מבניכם הוא המוזיקאי המחונן!
+          </p>
         </div>
 
         <div className="flex flex-col gap-4">
