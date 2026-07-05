@@ -3,13 +3,19 @@ import levenshtein from 'fast-levenshtein'
 /** @typedef {import('./game.js').Song} Song */
 /** @typedef {import('./rooms.js').Room} Room */
 
-const TEXT_DISTANCE_THRESHOLD = 2
+const TEXT_DISTANCE_THRESHOLD = 3
 
 /**
  * @param {string | undefined | null} value
  */
 function normalizeText(value) {
-  return (value ?? '').toString().trim().toLowerCase().replace(/\s+/g, ' ')
+  return (value ?? '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**
@@ -91,27 +97,34 @@ export function calculateRoundScores(room, questions) {
   const totalSongs = playlist?.songs.length ?? 0
   const songsRemaining = Math.max(0, totalSongs - room.playedTrackIds.length)
 
-  /** @type {Record<string, { questionScores: Record<string, { points: number, label: string }>, roundTotal: number, totalScore: number }>} */
+  /** @type {Record<string, { questionScores: Record<string, { points: number, label: string, playerAnswer: string, correctAnswer: string }>, roundTotal: number, totalScore: number }>} */
   const results = {}
 
   for (const player of room.players.values()) {
-    /** @type {Record<string, { points: number, label: string }>} */
+    /** @type {Record<string, { points: number, label: string, playerAnswer: string, correctAnswer: string }>} */
     const questionScores = {}
     let roundTotal = 0
 
     for (const question of questions) {
       const answer = player.answers[question.id] ?? ''
       let points = 0
+      let correctAnswer = ''
 
       if (question.type === 'number') {
         const correctYear = new Date(song.releaseDate).getFullYear()
+        correctAnswer = String(correctYear)
         points = scoreYearAnswer(answer, correctYear)
       } else {
-        const correct = getCorrectAnswer(song, question.id)
-        points = scoreTextAnswer(answer, correct)
+        correctAnswer = getCorrectAnswer(song, question.id)
+        points = scoreTextAnswer(answer, correctAnswer)
       }
 
-      questionScores[question.id] = { points, label: question.label }
+      questionScores[question.id] = {
+        points,
+        label: question.label,
+        playerAnswer: answer,
+        correctAnswer,
+      }
       roundTotal += points
     }
 

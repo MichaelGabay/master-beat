@@ -54,7 +54,7 @@ import { getSocket } from '@/lib/socket'
 
 /**
  * @typedef {{
- *   questionScores: Record<string, { points: number, label: string }>,
+ *   questionScores: Record<string, { points: number, label: string, playerAnswer: string, correctAnswer: string }>,
  *   roundTotal: number,
  *   totalScore: number,
  * }} PlayerRoundResult

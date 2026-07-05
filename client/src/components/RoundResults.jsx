@@ -1,7 +1,9 @@
-import { Music2, Trophy } from 'lucide-react'
+import { ChevronDown, Music2, Trophy } from 'lucide-react'
+import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 /**
  * @typedef {{
@@ -12,7 +14,7 @@ import { Card, CardContent } from '@/components/ui/card'
 
 /**
  * @typedef {{
- *   questionScores: Record<string, { points: number, label: string }>,
+ *   questionScores: Record<string, { points: number, label: string, playerAnswer: string, correctAnswer: string }>,
  *   roundTotal: number,
  *   totalScore: number,
  * }} PlayerRoundResult
@@ -62,6 +64,7 @@ export function RoundResults({
   isAdvancing = false,
 }) {
   const noSongsLeft = songsRemaining === 0
+  const [expandedQuestionId, setExpandedQuestionId] = useState(/** @type {string | null} */ (null))
 
   return (
     <div className="flex flex-col gap-4">
@@ -85,19 +88,61 @@ export function RoundResults({
             {questions.map((question) => {
               const score = playerResult.questionScores[question.id]
               const points = score?.points ?? 0
+              const isExpanded = expandedQuestionId === question.id
+              const playerAnswer = score?.playerAnswer?.trim() ?? ''
+              const correctAnswer = score?.correctAnswer ?? ''
 
               return (
                 <div
                   key={question.id}
-                  className="flex items-center justify-between rounded-xl border border-white/10 bg-black/20 px-4 py-3"
+                  className="overflow-hidden rounded-xl border border-white/10 bg-black/20"
                 >
-                  <span className="text-sm text-zinc-300">{question.label}</span>
-                  <span
-                    className={`text-sm font-bold ${points > 0 ? 'text-green-400' : 'text-zinc-500'}`}
-                    dir="ltr"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedQuestionId(isExpanded ? null : question.id)
+                    }
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-start transition-colors hover:bg-white/5"
                   >
-                    +{points} נק׳
-                  </span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ChevronDown
+                        className={cn(
+                          'size-4 shrink-0 text-zinc-500 transition-transform',
+                          isExpanded && 'rotate-180',
+                        )}
+                      />
+                      <span className="text-sm text-zinc-300">{question.label}</span>
+                    </div>
+                    <span
+                      className={`shrink-0 text-sm font-bold ${points > 0 ? 'text-green-400' : 'text-zinc-500'}`}
+                      dir="ltr"
+                    >
+                      +{points} נק׳
+                    </span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="space-y-3 border-t border-white/10 px-4 py-3">
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500">התשובה שלך</p>
+                        <p
+                          className={cn(
+                            'mt-1 text-sm',
+                            playerAnswer ? 'text-white' : 'text-zinc-500 italic',
+                          )}
+                          dir="ltr"
+                        >
+                          {playerAnswer || 'לא ענית'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500">התשובה הנכונה</p>
+                        <p className="mt-1 text-sm text-green-400" dir="ltr">
+                          {correctAnswer || '—'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
