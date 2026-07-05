@@ -1,10 +1,11 @@
 import {
   allPlayersSubmitted,
   beginQuestionPhase,
-  clearAnswerTimer,
   endGame,
   finishQuestionPhase,
   getRoundAudioPayload,
+  maybeFinishQuestionPhase,
+  skipBrokenSong,
   startRound,
 } from './game.js'
 import { getPlaylistById } from './playlists.js'
@@ -28,7 +29,12 @@ import {
  */
 export function registerSocketHandlers(io, socket) {
   socket.on('leaveRoom', (_payload, callback) => {
+    const room = getRoomBySocketId(socket.id)
     releaseSocketFromRoom(socket)
+    if (room) {
+      maybeFinishQuestionPhase(io, room)
+      broadcastPlayersUpdated(io, room)
+    }
     callback?.({ ok: true })
   })
 
@@ -130,6 +136,10 @@ export function registerSocketHandlers(io, socket) {
         connected: true,
       }
 
+      if (restoredPlayer.isHost) {
+        room.hostId = socket.id
+      }
+
       room.players.set(socket.id, restoredPlayer)
       socketToRoom.set(socket.id, trimmedCode)
       socket.join(trimmedCode)
@@ -149,7 +159,7 @@ export function registerSocketHandlers(io, socket) {
       return
     }
 
-    const nameTaken = getPlayersList(room).some(
+    const nameTaken = [...room.players.values(), ...room.disconnectedPlayers.values()].some(
       (player) => normalizePlayerName(player.name) === normalizedName,
     )
     if (nameTaken) {
@@ -357,6 +367,38 @@ export function registerSocketHandlers(io, socket) {
     callback?.({ ok: true })
   })
 
+  socket.on('skipSong', (_payload, callback) => {
+    const room = getRoomBySocketId(socket.id)
+
+    if (!room) {
+      callback?.({ ok: false, error: 'לא נמצא בחדר' })
+      return
+    }
+
+    if (socket.id !== room.hostId) {
+      callback?.({ ok: false, error: 'רק המארח יכול לדלג על שיר' })
+      return
+    }
+
+    if (room.phase !== 'audio') {
+      callback?.({ ok: false, error: 'לא בשלב השמעה' })
+      return
+    }
+
+    const result = skipBrokenSong(io, room)
+    if (!result.ok) {
+      if (result.gameEnded) {
+        endGame(io, room)
+        callback?.({ ok: true, gameEnded: true })
+        return
+      }
+      callback?.({ ok: false, error: result.error })
+      return
+    }
+
+    callback?.({ ok: true, roundAudio: result.roundAudio })
+  })
+
   socket.on('submitAnswers', ({ answers }, callback) => {
     const room = getRoomBySocketId(socket.id)
 
@@ -452,10 +494,6 @@ export function registerSocketHandlers(io, socket) {
   })
 
   socket.on('disconnect', () => {
-    const room = getRoomBySocketId(socket.id)
-    if (room) {
-      clearAnswerTimer(room)
-    }
     removePlayerFromRoom(io, socket.id)
   })
 }

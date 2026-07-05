@@ -1,4 +1,4 @@
-import { buildQuestionPayload } from './game.js'
+import { buildQuestionPayload, maybeFinishQuestionPhase } from './game.js'
 
 /** @typedef {{ id: string, name: string, isHost: boolean, score: number, submitted: boolean, answers: Record<string, string>, connected: boolean }} Player */
 
@@ -128,25 +128,6 @@ export function validateGameSettings(settings, playlist = { isWithLyrics: true }
 }
 
 /**
- * @param {import('socket.io').Server} io
- * @param {Room} room
- */
-function closeRoomDueToHostDisconnect(io, room) {
-  for (const playerId of room.players.keys()) {
-    socketToRoom.delete(playerId)
-  }
-
-  if (room.players.size > 0) {
-    io.to(room.code).emit('hostDisconnected', {
-      reason: 'hostDisconnected',
-      message: 'המארח התנתק. המשחק הסתיים.',
-    })
-  }
-
-  rooms.delete(room.code)
-}
-
-/**
  * @param {import('socket.io').Socket} socket
  * @returns {boolean}
  */
@@ -190,16 +171,10 @@ export function removePlayerFromRoom(io, socketId) {
     return
   }
 
-  const isHost = socketId === room.hostId
   const player = room.players.get(socketId)
 
   room.players.delete(socketId)
   socketToRoom.delete(socketId)
-
-  if (isHost) {
-    closeRoomDueToHostDisconnect(io, room)
-    return
-  }
 
   if (player) {
     room.disconnectedPlayers.set(normalizePlayerName(player.name), {
@@ -215,6 +190,7 @@ export function removePlayerFromRoom(io, socketId) {
   }
 
   broadcastPlayersUpdated(io, room)
+  maybeFinishQuestionPhase(io, room)
 }
 
 /**

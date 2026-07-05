@@ -7,7 +7,9 @@ import { PhaseTransition } from '@/components/PhaseTransition'
 import { QuestionPhase } from '@/components/QuestionPhase'
 import { RoundResults } from '@/components/RoundResults'
 import { WaitingForOthers } from '@/components/WaitingForOthers'
+import { useSocketReconnect } from '@/hooks/useSocketReconnect'
 import { createAndPlayPreview } from '@/lib/audio'
+import { clearSession } from '@/lib/session'
 import { getSocket } from '@/lib/socket'
 
 /**
@@ -135,10 +137,48 @@ export function GameActive({
   const [playerAudioState, setPlayerAudioState] = useState(/** @type {'idle' | 'playing'} */ ('idle'))
   const [playbackError, setPlaybackError] = useState(/** @type {string | null} */ (null))
   const [isStartingQuestions, setIsStartingQuestions] = useState(false)
+  const [isSkippingSong, setIsSkippingSong] = useState(false)
   const [isAdvancing, setIsAdvancing] = useState(false)
   const audioRef = useRef(/** @type {HTMLAudioElement | null} */ (null))
   const audioTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null))
   const socketIdRef = useRef(/** @type {string | null} */ (null))
+
+  const applyRestoredSession = useCallback((session) => {
+    if (!session) return
+
+    if (session.phase) {
+      setPhase(session.phase)
+    }
+    if (session.roundNumber != null) {
+      setRoundNumber(session.roundNumber)
+    }
+    if (session.score != null) {
+      setScore(session.score)
+    }
+    if (session.questionsPayload) {
+      setQuestionsPayload(session.questionsPayload)
+    }
+    if (session.roundResultsPayload) {
+      setRoundResultsPayload(session.roundResultsPayload)
+    }
+    if (session.rankings) {
+      setRankings(session.rankings)
+    }
+  }, [])
+
+  useSocketReconnect(
+    useCallback(
+      (response) => {
+        const socket = getSocket()
+        socketIdRef.current = socket.id ?? null
+
+        if (response.session) {
+          applyRestoredSession(response.session)
+        }
+      },
+      [applyRestoredSession],
+    ),
+  )
 
   const clearPlaybackTimer = useCallback(() => {
     if (audioTimerRef.current) {
@@ -192,7 +232,7 @@ export function GameActive({
       }, playAudioPayload.songDuration * 1000)
     } catch {
       setPlaybackStatus('idle')
-      setPlaybackError('לא ניתן לנגן את השיר. בדוק את עוצמת הקול ונסה שוב.')
+      setPlaybackError('לא ניתן לנגן את השיר. נסה שוב, התחל שאלות, או דלג לשיר הבא.')
       socket.emit('hostPlaybackEnded', {}, () => {})
     }
   }, [isHost, playAudioPayload, playbackStatus, stopAudio, clearPlaybackTimer])
@@ -211,6 +251,36 @@ export function GameActive({
       }
     })
   }, [isHost, isStartingQuestions])
+
+  const handleSkipSong = useCallback(() => {
+    if (!isHost || isSkippingSong) return
+
+    setIsSkippingSong(true)
+    const socket = getSocket()
+
+    socket.emit('skipSong', {}, (response) => {
+      setIsSkippingSong(false)
+
+      if (!response?.ok) {
+        setPlaybackError(response?.error ?? 'דילוג על השיר נכשל')
+        return
+      }
+
+      if (response.gameEnded) {
+        return
+      }
+
+      if (response.roundAudio) {
+        setPlayAudioPayload(response.roundAudio)
+        setRoundNumber(response.roundAudio.roundNumber)
+      }
+
+      setPhase('audio')
+      setPlaybackStatus('idle')
+      setPlaybackError(null)
+      stopAudio()
+    })
+  }, [isHost, isSkippingSong, stopAudio])
 
   const handleNextSong = useCallback(() => {
     if (!isHost || isAdvancing) return
@@ -336,6 +406,7 @@ export function GameActive({
       setRankings(finalRankings)
       setPhase('ended')
       stopAudio()
+      clearSession()
     }
 
     socket.on('roundStarted', handleRoundStarted)
@@ -380,7 +451,9 @@ export function GameActive({
           isSongReady={Boolean(playAudioPayload)}
           onPlay={handlePlay}
           onStartQuestions={handleStartQuestions}
+          onSkipSong={handleSkipSong}
           isStartingQuestions={isStartingQuestions}
+          isSkippingSong={isSkippingSong}
         />
       )
     }

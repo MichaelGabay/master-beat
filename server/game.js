@@ -157,6 +157,37 @@ export function startRound(io, room) {
 }
 
 /**
+ * Replace the current song with a new one (same round) when playback fails.
+ * @param {import('socket.io').Server} io
+ * @param {Room} room
+ * @returns {{ ok: true, roundAudio: NonNullable<ReturnType<typeof getRoundAudioPayload>> } | { ok: false, error: string, gameEnded?: boolean }}
+ */
+export function skipBrokenSong(io, room) {
+  const song = pickRandomSong(room)
+  if (!song) {
+    return { ok: false, error: 'אין עוד שירים ברשימת ההשמעה', gameEnded: true }
+  }
+
+  room.phase = 'audio'
+  resetPlayerSubmissions(room)
+  clearAnswerTimer(room)
+
+  const roundAudio = getRoundAudioPayload(room)
+  if (!roundAudio) {
+    return { ok: false, error: 'הכנת השמעת הסיבוב נכשלה' }
+  }
+
+  io.to(room.code).emit('roundStarted', {
+    roundNumber: room.roundNumber,
+    phase: 'audio',
+  })
+
+  io.to(room.hostId).emit('playAudio', roundAudio)
+
+  return { ok: true, roundAudio }
+}
+
+/**
  * @param {Room} room
  */
 export function clearAnswerTimer(room) {
@@ -182,6 +213,19 @@ export function getAnsweringPlayers(room) {
 export function allPlayersSubmitted(room) {
   const answeringPlayers = getAnsweringPlayers(room)
   return answeringPlayers.length > 0 && answeringPlayers.every((player) => player.submitted)
+}
+
+/**
+ * @param {import('socket.io').Server} io
+ * @param {Room} room
+ */
+export function maybeFinishQuestionPhase(io, room) {
+  if (room.phase !== 'questions') return
+
+  const answeringPlayers = getAnsweringPlayers(room)
+  if (answeringPlayers.length === 0 || allPlayersSubmitted(room)) {
+    finishQuestionPhase(io, room)
+  }
 }
 
 /**

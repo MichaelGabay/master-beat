@@ -5,9 +5,11 @@ import { Link } from 'react-router-dom'
 import { FullscreenToggle } from '@/components/FullscreenToggle'
 import { Button } from '@/components/ui/button'
 import { leaveRoom } from '@/lib/socket'
+import { clearSession } from '@/lib/session'
 
 export function HomeScreen() {
   useEffect(() => {
+    clearSession()
     leaveRoom().catch(() => {})
   }, [])
 
