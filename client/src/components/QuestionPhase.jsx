@@ -144,6 +144,24 @@ export function QuestionPhase({ questions, deadline, answerTimeLimit, onSubmit }
     setHasSubmitted(true)
   }
 
+  const canInteract = !hasSubmitted && remainingMs > 0
+
+  const handleKeyDown = (event) => {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    if (!canInteract) return
+
+    if (isLast) {
+      handleSubmit()
+    } else {
+      setCurrentIndex((index) => index + 1)
+    }
+  }
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [currentIndex])
+
   const remainingSeconds = Math.ceil(remainingMs / 1000)
 
   if (!currentQuestion) return null
@@ -175,10 +193,12 @@ export function QuestionPhase({ questions, deadline, answerTimeLimit, onSubmit }
             ref={inputRef}
             type={currentQuestion.type === 'number' ? 'number' : 'text'}
             inputMode={currentQuestion.type === 'number' ? 'numeric' : 'text'}
+            enterKeyHint={isLast ? 'send' : 'next'}
             value={answers[currentQuestion.id] ?? ''}
             onChange={(event) => updateAnswer(event.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={currentQuestion.type === 'number' ? 'לדוגמה: 1985' : 'התשובה שלך'}
-            disabled={hasSubmitted || remainingMs === 0}
+            disabled={!canInteract}
             autoComplete="off"
             className={cn('text-base', currentQuestion.type === 'number' && 'text-right')}
             dir={currentQuestion.type === 'number' ? 'ltr' : undefined}

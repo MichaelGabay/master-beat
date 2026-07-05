@@ -5,6 +5,41 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
+const MAX_QUESTION_POINTS = 10
+
+/**
+ * @typedef {'full' | 'partial' | 'none'} ScoreLevel
+ */
+
+/**
+ * @param {number} points
+ * @returns {ScoreLevel}
+ */
+function getScoreLevel(points) {
+  if (points >= MAX_QUESTION_POINTS) return 'full'
+  if (points > 0) return 'partial'
+  return 'none'
+}
+
+/** @type {Record<ScoreLevel, { bar: string, points: string, ring: string }>} */
+const scoreLevelStyles = {
+  full: {
+    bar: 'bg-green-500',
+    points: 'text-green-400',
+    ring: 'ring-green-500/30',
+  },
+  partial: {
+    bar: 'bg-amber-400',
+    points: 'text-amber-300',
+    ring: 'ring-amber-400/30',
+  },
+  none: {
+    bar: 'bg-red-500/80',
+    points: 'text-red-400/90',
+    ring: 'ring-red-500/20',
+  },
+}
+
 /**
  * @typedef {{
  *   id: string,
@@ -67,89 +102,108 @@ export function RoundResults({
   const [expandedQuestionId, setExpandedQuestionId] = useState(/** @type {string | null} */ (null))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       {playerResult && (
-        <>
-          <div className="flex flex-col gap-2">
-            {questions.map((question) => {
-              const score = playerResult.questionScores[question.id]
-              const points = score?.points ?? 0
-              const isExpanded = expandedQuestionId === question.id
-              const playerAnswer = score?.playerAnswer?.trim() ?? ''
-              const correctAnswer = score?.correctAnswer ?? ''
+        <Card className="border-purple-500/25 bg-gradient-to-b from-purple-500/10 to-black/20">
+          <CardContent className="flex flex-col gap-4 pt-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-purple-300/80">
+              התוצאות שלי · סיבוב {roundNumber}
+            </p>
 
-              return (
-                <div
-                  key={question.id}
-                  className="overflow-hidden rounded-xl border border-white/10 bg-black/20"
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExpandedQuestionId(isExpanded ? null : question.id)
-                    }
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-start transition-colors hover:bg-white/5"
+            <p className="text-sm text-zinc-400">
+              סה״כ הרווחת בסיבוב זה{' '}
+              <span
+                className={cn(
+                  'font-semibold',
+                  playerResult.roundTotal > 0 ? 'text-green-400' : 'text-zinc-300',
+                )}
+                dir="ltr"
+              >
+                {playerResult.roundTotal > 0 ? `+${playerResult.roundTotal}` : playerResult.roundTotal}
+              </span>
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-zinc-500">פירוט לפי שאלה</p>
+              {questions.map((question) => {
+                const score = playerResult.questionScores[question.id]
+                const points = score?.points ?? 0
+                const level = getScoreLevel(points)
+                const styles = scoreLevelStyles[level]
+                const isExpanded = expandedQuestionId === question.id
+                const playerAnswer = score?.playerAnswer?.trim() ?? ''
+                const correctAnswer = score?.correctAnswer ?? ''
+
+                return (
+                  <div
+                    key={question.id}
+                    className={cn(
+                      'overflow-hidden rounded-xl border border-white/10 bg-black/25 ring-1',
+                      styles.ring,
+                    )}
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <ChevronDown
-                        className={cn(
-                          'size-4 shrink-0 text-zinc-500 transition-transform',
-                          isExpanded && 'rotate-180',
-                        )}
-                      />
-                      <span className="text-sm text-zinc-300">{question.label}</span>
-                    </div>
-                    <span
-                      className={`shrink-0 text-sm font-bold ${points > 0 ? 'text-green-400' : 'text-zinc-500'}`}
-                      dir="ltr"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedQuestionId(isExpanded ? null : question.id)
+                      }
+                      className="flex w-full items-stretch text-start transition-colors hover:bg-white/5"
                     >
-                      +{points} נק׳
-                    </span>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="space-y-3 border-t border-white/10 px-4 py-3">
-                      <div>
-                        <p className="text-xs font-medium text-zinc-500">התשובה שלך</p>
-                        <p
-                          className={cn(
-                            'mt-1 text-sm',
-                            playerAnswer ? 'text-white' : 'text-zinc-500 italic',
-                          )}
+                      <div className={cn('w-1 shrink-0', styles.bar)} aria-hidden />
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <ChevronDown
+                            className={cn(
+                              'size-4 shrink-0 text-zinc-500 transition-transform',
+                              isExpanded && 'rotate-180',
+                            )}
+                          />
+                          <span className="text-sm text-zinc-200">{question.label}</span>
+                        </div>
+                        <span
+                          className={cn('shrink-0 text-sm font-bold', styles.points)}
                           dir="ltr"
                         >
-                          {playerAnswer || 'לא ענית'}
-                        </p>
+                          +{points} נק׳
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-zinc-500">התשובה הנכונה</p>
-                        <p className="mt-1 text-sm text-green-400" dir="ltr">
-                          {correctAnswer || '—'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                    </button>
 
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-purple-500/20 bg-purple-500/5 px-3 py-2">
-            <p className="text-xs font-medium text-zinc-400">
-              סה״כ הרווחת בסיבוב זה
-            </p>
-            <p className="shrink-0 text-base font-bold text-white" dir="ltr">
-              +{playerResult.roundTotal}
-            </p>
-          </div>
-        </>
+                    {isExpanded && (
+                      <div className="space-y-3 border-t border-white/10 px-4 py-3 ps-5">
+                        <div>
+                          <p className="text-xs font-medium text-zinc-500">התשובה שלך</p>
+                          <p
+                            className={cn(
+                              'mt-1 text-sm',
+                              playerAnswer ? 'text-white' : 'text-zinc-500 italic',
+                            )}
+                            dir="ltr"
+                          >
+                            {playerAnswer || 'לא ענית'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-500">התשובה הנכונה</p>
+                          <p className="mt-1 text-sm text-green-400" dir="ltr">
+                            {correctAnswer || '—'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {standings.length > 0 && (
         <Card className="border-white/10 bg-black/20">
           <CardContent className="flex flex-col gap-2 pt-5">
             <p className="mb-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
-              מצב הנקודות
+              לוח התוצאות
             </p>
             {standings.map((entry) => {
               const isCurrentPlayer = entry.id === currentPlayerId
@@ -157,28 +211,31 @@ export function RoundResults({
               return (
                 <div
                   key={entry.id}
-                  className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
+                  className={cn(
+                    'flex items-center justify-between rounded-lg border px-4 py-3',
                     isCurrentPlayer
                       ? 'border-purple-500/40 bg-purple-500/10'
-                      : 'border-white/5 bg-white/5'
-                  }`}
+                      : 'border-white/5 bg-white/5',
+                  )}
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <span
-                      className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      className={cn(
+                        'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
                         isCurrentPlayer
                           ? 'bg-purple-500/30 text-purple-100'
-                          : 'bg-white/10 text-zinc-300'
-                      }`}
+                          : 'bg-white/10 text-zinc-300',
+                      )}
                     >
                       {entry.rank}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-white">
-                        {entry.name}
-                      </p>
+                      <p className="truncate text-sm font-medium text-white">{entry.name}</p>
                       <p
-                        className={`text-xs ${entry.roundTotal > 0 ? 'text-green-400' : 'text-zinc-500'}`}
+                        className={cn(
+                          'text-xs',
+                          entry.roundTotal > 0 ? 'text-green-400' : 'text-zinc-500',
+                        )}
                         dir="ltr"
                       >
                         +{entry.roundTotal} בסיבוב
@@ -186,7 +243,10 @@ export function RoundResults({
                     </div>
                   </div>
                   <span
-                    className={`shrink-0 text-sm font-semibold ${isCurrentPlayer ? 'text-purple-200' : 'text-zinc-300'}`}
+                    className={cn(
+                      'shrink-0 text-sm font-semibold',
+                      isCurrentPlayer ? 'text-purple-200' : 'text-zinc-300',
+                    )}
                     dir="ltr"
                   >
                     {entry.totalScore} נק׳
