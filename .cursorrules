@@ -1,0 +1,96 @@
+# Project Overview
+You are an expert Full-Stack Developer. You are tasked with building a mobile-first web application: A "Guess the Song" multiplayer trivia game.
+The game consists of a "Host" (whose device plays the music and manages the game settings) and "Players" (who join via a code, listen to the host's audio, and answer questions on their own devices).
+
+## Tech Stack
+*   **Frontend:** React.js, React Router DOM, Tailwind CSS.
+*   **Backend:** Node.js, Express.
+*   **Real-time Communication:** WebSockets (Socket.io recommended).
+*   **Database:** MongoDB (using Mongoose).
+*   **UI Components:** shadcn/ui (Radix UI), Lucide React (for icons).
+*   **Utility:** Levenshtein distance algorithm library (e.g., `js-levenshtein` or `fast-levenshtein`) for fuzzy string matching.
+*   **Environment:** Start on local environment.
+
+## Design & UI/UX Guidelines
+*   **Mobile-Only Design:** The app must be strictly designed and optimized for mobile screens (use `max-w-md mx-auto` containers or similar constraints).
+*   **Theme:** Modern, sleek, and music-inspired. Use dark mode aesthetics or vibrant gradients suitable for a music trivia game.
+*   **Components:** Heavily utilize `shadcn/ui` for buttons, inputs, switches, cards, and progress bars.
+*   **Full Screen:** Implement a small full-screen toggle button using the Fullscreen API.
+
+---
+
+## Game Flow & Features
+
+### 1. Home Screen
+*   Two main buttons: "Create Game" (Host) and "Join Game" (Player).
+*   Bottom-left corner: A small icon/button to enter Full-Screen mode.
+
+### 2. Create Game (Host View)
+*   **Initial Step:** Enter Host name.
+*   **Lobby & Code:** Generate a random 6-digit room code. Display it at the top with a "Copy" icon.
+*   **Players List:** Display a real-time list of joined players at the bottom.
+*   **Game Settings (Middle Section):**
+    *   **Playlist Selection:** Display available playlists beautifully (Image + Name). Currently, load from `All_Out_80s.json`.
+    *   **Question Toggles:**
+        1. Singer Name
+        2. Creator Name
+        3. Release Year
+        4. Complete the Lyric (Disable/Hide if playlist's `isWithLyrics` is false).
+        *Validation:* Cannot start the game unless at least 1 toggle is ON.
+    *   **Song Duration:** Select how many seconds the song will play (Options: 2, 5, 10, 30 seconds).
+    *   **Answer Time Limit:** Numeric input for seconds allowed to answer all questions.
+*   **Start Button:** "Start Game" initiates the first round.
+
+### 3. Join Game (Player View)
+*   Enter 6-digit code and Player Name.
+*   Wait in the lobby (showing "Waiting for host to start...").
+
+### 4. Core Game Loop
+*   **Audio Phase:** The Host's device plays a random song from the playlist for the selected duration. (Players' devices are silent).
+*   **Question Phase:** 
+    *   Once the song stops, questions appear on the players' devices.
+    *   A progress bar at the top shows the remaining answer time.
+    *   Users can answer, click "I don't know" to skip, and navigate back and forth to edit answers before submission.
+    *   **Submit:** User clicks "Submit". Wait screen appears until everyone submits or time runs out.
+*   **Constraint:** A song that has been played in the current session CANNOT be chosen again.
+
+### 5. Scoring System
+Total score must always be visible at the top of the player's screen.
+Each question is worth a maximum of 10 points.
+*   **Text Questions (Singer, Creator, Lyrics):** 
+    *   Use Levenshtein distance to allow minor typos (define a reasonable threshold for trivia).
+    *   Correct (within threshold): 10 points. Incorrect: 0 points.
+*   **Number Question (Release Year):**
+    *   Exact match: 10 points.
+    *   Off by 1 to 3 years: 8 points.
+    *   Off by 4 to 10 years: 5 points.
+    *   Off by >10 years: 0 points.
+
+### 6. Round Results & Game End
+*   After each round, show players the points they earned for that round and their updated total score.
+*   Host controls progression: Can click "Next Song" or "End Game".
+*   Game ends automatically if all songs in the playlist are exhausted.
+*   **Leaderboard:** Final screen shows 1st, 2nd, and 3rd place podiums, and the complete ranking of all players.
+
+---
+
+## Data Structure Example
+The application reads from a JSON structure like this (Example: `All_Out_80s.json`):
+```json
+{
+  "name": "All Out 80s",
+  "isWithLyrics": true,
+  "imageUrl": "[https://i.scdn.co/image/ab67706f00000002fb8e01f2c022ab1a32e2c5a0](https://i.scdn.co/image/ab67706f00000002fb8e01f2c022ab1a32e2c5a0)",
+  "songs": [
+    {
+      "trackId": 80815277,
+      "previewUrl": "https://...",
+      "trackName": "La Isla Bonita",
+      "artistName": "Madonna",
+      "releaseDate": "1986-06-30T07:00:00Z",
+      "lyrics": "...",
+      "completeSentence": "This is where I long to be La isla bonita",
+      "questionSentence": "This is where I long to be La isla ______"
+    }
+  ]
+}
