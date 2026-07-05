@@ -79,12 +79,12 @@ function matchesTextAnswer(answer, expected) {
 }
 
 /**
- * Split a multi-artist name into individual artist alternatives (e.g. "A & B").
+ * Split a multi-artist name into individual artist alternatives (e.g. "A & B", "A, B").
  * @param {string} artistName
  */
 function splitArtistAlternatives(artistName) {
   return artistName
-    .split(/\s*&\s*|\s+and\s+/i)
+    .split(/\s*&\s*|\s+and\s+|\s*,\s*/i)
     .map((part) => part.trim())
     .filter(Boolean)
 }
