@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { FullscreenToggle } from '@/components/FullscreenToggle'
@@ -9,7 +9,36 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
-import { getSocket, leaveRoom } from '@/lib/socket'
+import { useSocketReconnect } from '@/hooks/useSocketReconnect'
+import { clearSession, loadSession, saveSession } from '@/lib/session'
+import { getSocket, leaveRoom, reconnectToSession } from '@/lib/socket'
+
+function applyJoinResponse(response, setters) {
+  const {
+    setJoinedCode,
+    setPlayers,
+    setRestoredSession,
+    setGameStarted,
+    setRoomCode,
+    setPlayerName,
+  } = setters
+
+  setJoinedCode(response.code)
+  setPlayers(response.players)
+  setRoomCode?.(response.code)
+
+  if (response.reconnected) {
+    toast({
+      title: 'חיבור מחדש',
+      description: 'ברוך שובך! המשך מהמקום שבו עצרת.',
+    })
+
+    if (response.session?.status && response.session.status !== 'lobby') {
+      setRestoredSession(response.session)
+      setGameStarted(true)
+    }
+  }
+}
 
 export function JoinGame() {
   const [roomCode, setRoomCode] = useState('')
@@ -18,12 +47,51 @@ export function JoinGame() {
   const [players, setPlayers] = useState([])
   const [error, setError] = useState('')
   const [isJoining, setIsJoining] = useState(false)
+  const [isRestoring, setIsRestoring] = useState(true)
   const [gameStarted, setGameStarted] = useState(false)
   const [restoredSession, setRestoredSession] = useState(null)
 
-  useEffect(() => {
-    leaveRoom().catch(() => {})
+  const handleRestoredSession = useCallback((response) => {
+    if (!response?.ok) return
+
+    applyJoinResponse(response, {
+      setJoinedCode,
+      setPlayers,
+      setRestoredSession,
+      setGameStarted,
+    })
   }, [])
+
+  useSocketReconnect(handleRestoredSession, Boolean(joinedCode) && !gameStarted)
+
+  useEffect(() => {
+    const session = loadSession()
+
+    if (session?.role === 'player') {
+      setRoomCode(session.roomCode)
+      setPlayerName(session.playerName)
+
+      reconnectToSession(session).then((response) => {
+        setIsRestoring(false)
+
+        if (!response?.ok) {
+          clearSession()
+          return
+        }
+
+        handleRestoredSession(response)
+
+        if (session.gameStarted && response.session?.status !== 'lobby') {
+          setRestoredSession(response.session ?? null)
+          setGameStarted(true)
+        }
+      })
+      return
+    }
+
+    setIsRestoring(false)
+    leaveRoom().catch(() => {})
+  }, [handleRestoredSession])
 
   useEffect(() => {
     if (!joinedCode) return
@@ -36,6 +104,10 @@ export function JoinGame() {
 
     const handleGameStarted = () => {
       setGameStarted(true)
+      const session = loadSession()
+      if (session) {
+        saveSession({ ...session, gameStarted: true })
+      }
     }
 
     socket.on('playersUpdated', handlePlayersUpdated)
@@ -75,20 +147,14 @@ export function JoinGame() {
         return
       }
 
-      setJoinedCode(response.code)
-      setPlayers(response.players)
+      saveSession({
+        role: 'player',
+        roomCode: response.code,
+        playerName: trimmedName,
+        gameStarted: false,
+      })
 
-      if (response.reconnected) {
-        toast({
-          title: 'חיבור מחדש',
-          description: 'ברוך שובך! המשך מהמקום שבו עצרת.',
-        })
-
-        if (response.session?.status && response.session.status !== 'lobby') {
-          setRestoredSession(response.session)
-          setGameStarted(true)
-        }
-      }
+      handleRestoredSession(response)
     })
   }
 
@@ -99,6 +165,15 @@ export function JoinGame() {
 
   if (joinedCode && gameStarted) {
     return <GameScreen playerName={playerName.trim()} initialSession={restoredSession} />
+  }
+
+  if (isRestoring) {
+    return (
+      <div className="relative flex min-h-svh flex-col items-center justify-center bg-gradient-to-b from-[#0f0a1a] via-[#1a0f2e] to-[#0a0612]">
+        <Loader2 className="size-8 animate-spin text-purple-400" />
+        <p className="mt-4 text-sm text-zinc-400">מתחבר מחדש למשחק...</p>
+      </div>
+    )
   }
 
   return (

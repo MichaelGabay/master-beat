@@ -1,5 +1,5 @@
-import { Copy, Check } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Copy, Check, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { FullscreenToggle } from '@/components/FullscreenToggle'
@@ -9,9 +9,11 @@ import { PlayersList } from '@/components/PlayersList'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useSocketReconnect } from '@/hooks/useSocketReconnect'
 import { unlockAudioPlayback } from '@/lib/audio'
 import { fetchPlaylists, getPlaylistById } from '@/lib/playlists'
-import { getSocket, leaveRoom } from '@/lib/socket'
+import { clearSession, loadSession, saveSession } from '@/lib/session'
+import { getSocket, leaveRoom, reconnectToSession } from '@/lib/socket'
 
 const DEFAULT_SETTINGS = {
   playlistId: '',
@@ -40,12 +42,52 @@ export function CreateGame() {
   const [isStarting, setIsStarting] = useState(false)
   const [startError, setStartError] = useState('')
   const [initialRoundAudio, setInitialRoundAudio] = useState(null)
+  const [restoredSession, setRestoredSession] = useState(null)
+  const [isRestoring, setIsRestoring] = useState(true)
 
   const playlist = getPlaylistById(playlists, settings.playlistId) ?? playlists[0]
 
-  useEffect(() => {
-    leaveRoom().catch(() => {})
+  const handleRestoredSession = useCallback((response) => {
+    if (!response?.ok) return
+
+    setRoomCode(response.code)
+    setPlayers(response.players)
+
+    if (response.session?.status && response.session.status !== 'lobby') {
+      setRestoredSession(response.session)
+      setGameStarted(true)
+    }
   }, [])
+
+  useSocketReconnect(handleRestoredSession, Boolean(roomCode) && !gameStarted)
+
+  useEffect(() => {
+    const session = loadSession()
+
+    if (session?.role === 'host') {
+      setHostName(session.playerName)
+
+      reconnectToSession(session).then((response) => {
+        setIsRestoring(false)
+
+        if (!response?.ok) {
+          clearSession()
+          return
+        }
+
+        handleRestoredSession(response)
+
+        if (session.gameStarted && response.session?.status !== 'lobby') {
+          setRestoredSession(response.session ?? null)
+          setGameStarted(true)
+        }
+      })
+      return
+    }
+
+    setIsRestoring(false)
+    leaveRoom().catch(() => {})
+  }, [handleRestoredSession])
 
   useEffect(() => {
     let cancelled = false
@@ -132,6 +174,13 @@ export function CreateGame() {
 
       setRoomCode(response.code)
       setPlayers(response.players)
+
+      saveSession({
+        role: 'host',
+        roomCode: response.code,
+        playerName: trimmedName,
+        gameStarted: false,
+      })
     })
   }
 
@@ -156,6 +205,11 @@ export function CreateGame() {
       }
 
       setGameStarted(true)
+      const session = loadSession()
+      if (session) {
+        saveSession({ ...session, gameStarted: true })
+      }
+
       if (response.roundAudio) {
         setInitialRoundAudio(response.roundAudio)
       }
@@ -174,7 +228,23 @@ export function CreateGame() {
   }
 
   if (roomCode && gameStarted) {
-    return <GameScreen isHost playerName={hostName.trim()} initialRoundAudio={initialRoundAudio} />
+    return (
+      <GameScreen
+        isHost
+        playerName={hostName.trim()}
+        initialRoundAudio={initialRoundAudio}
+        initialSession={restoredSession}
+      />
+    )
+  }
+
+  if (isRestoring) {
+    return (
+      <div className="relative flex min-h-svh flex-col items-center justify-center bg-gradient-to-b from-[#0f0a1a] via-[#1a0f2e] to-[#0a0612]">
+        <Loader2 className="size-8 animate-spin text-purple-400" />
+        <p className="mt-4 text-sm text-zinc-400">מתחבר מחדש למשחק...</p>
+      </div>
+    )
   }
 
   return (

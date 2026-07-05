@@ -1,4 +1,4 @@
-import { Music2, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
+import { Music2, Play, RotateCcw, SkipForward, Volume2, VolumeX } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,7 +12,9 @@ import { Card, CardContent } from '@/components/ui/card'
  *   isSongReady?: boolean,
  *   onPlay?: () => void,
  *   onStartQuestions?: () => void,
+ *   onSkipSong?: () => void,
  *   isStartingQuestions?: boolean,
+ *   isSkippingSong?: boolean,
  * }} props
  */
 export function AudioPlaying({
@@ -23,7 +25,9 @@ export function AudioPlaying({
   isSongReady = true,
   onPlay,
   onStartQuestions,
+  onSkipSong,
   isStartingQuestions = false,
+  isSkippingSong = false,
 }) {
   const isPlaying = playbackStatus === 'playing'
   const isFinished = playbackStatus === 'finished'
@@ -79,6 +83,35 @@ export function AudioPlaying({
             <Play className="size-5" />
             {isSongReady ? 'נגן שיר' : 'טוען שיר...'}
           </Button>
+        )}
+
+        {isIdle && playbackError && (
+          <div className="flex w-full flex-col gap-2">
+            {onStartQuestions && (
+              <Button
+                type="button"
+                size="lg"
+                disabled={isStartingQuestions}
+                onClick={onStartQuestions}
+                className="h-14 w-full rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-base font-semibold text-white shadow-lg shadow-purple-500/25 hover:from-purple-500 hover:to-pink-500"
+              >
+                {isStartingQuestions ? 'מתחיל...' : 'התחל שאלות בכל זאת'}
+              </Button>
+            )}
+            {onSkipSong && (
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                disabled={isSkippingSong}
+                onClick={onSkipSong}
+                className="h-14 w-full rounded-xl border-white/15 bg-white/5 text-base font-semibold text-white hover:bg-white/10"
+              >
+                <SkipForward className="size-5" />
+                {isSkippingSong ? 'טוען שיר...' : 'דלג לשיר הבא'}
+              </Button>
+            )}
+          </div>
         )}
 
         {isFinished && (
