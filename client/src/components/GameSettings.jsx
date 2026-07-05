@@ -1,8 +1,11 @@
-import { Check, Music2, Play } from 'lucide-react'
+import { Check, ListMusic, Music2, Play } from 'lucide-react'
+import { useState } from 'react'
 
+import { PlaylistOption, PlaylistPickerSheet } from '@/components/PlaylistPickerSheet'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { getPreviewPlaylists } from '@/lib/playlists'
 import { cn } from '@/lib/utils'
 
 const SONG_DURATIONS = [2, 5, 10, 30]
@@ -44,6 +47,10 @@ export function GameSettings({
   onStartGame,
   isStarting = false,
 }) {
+  const [isPlaylistPickerOpen, setIsPlaylistPickerOpen] = useState(false)
+  const previewPlaylists = getPreviewPlaylists(playlists, playlist.id)
+  const hasMorePlaylists = playlists.length > previewPlaylists.length
+
   const hasActiveQuestion = Object.entries(settings.questions).some(([key, enabled]) => {
     if (!enabled) return false
     const option = QUESTION_OPTIONS.find((item) => item.key === key)
@@ -80,49 +87,29 @@ export function GameSettings({
           </CardTitle>
           <CardDescription>בחר את רשימת ההשמעה למשחק הזה.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">
-            {playlists.map((item) => {
-              const isSelected = item.id === playlist.id
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => selectPlaylist(item.id)}
-                  className={cn(
-                    'flex items-center gap-4 rounded-xl border p-3 text-start transition-all active:scale-[0.98]',
-                    isSelected
-                      ? 'border-purple-500/40 bg-gradient-to-r from-purple-500/10 to-pink-500/10 shadow-md shadow-purple-500/15'
-                      : 'border-white/15 bg-white/5 hover:bg-white/10',
-                  )}
-                >
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="size-16 shrink-0 rounded-lg object-cover shadow-lg shadow-purple-500/20"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-semibold text-white">{item.name}</p>
-                    <p className="mt-0.5 text-xs text-zinc-400">
-                      {item.isWithLyrics ? 'כולל שאלות מילים' : 'ללא שאלות מילים'}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      'flex size-6 shrink-0 items-center justify-center rounded-full transition-colors',
-                      isSelected
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                        : 'border border-white/20 bg-black/20',
-                    )}
-                    aria-hidden
-                  >
-                    {isSelected ? <Check className="size-3.5 stroke-[3]" /> : null}
-                  </span>
-                </button>
-              )
-            })}
+            {previewPlaylists.map((item) => (
+              <PlaylistOption
+                key={item.id}
+                item={item}
+                isSelected={item.id === playlist.id}
+                onSelect={() => selectPlaylist(item.id)}
+              />
+            ))}
           </div>
+
+          {hasMorePlaylists ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsPlaylistPickerOpen(true)}
+              className="h-11 rounded-xl border-white/15 bg-white/5 text-zinc-200 hover:bg-white/10"
+            >
+              <ListMusic className="size-4" />
+              בחר פלייליסט ({playlists.length})
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -232,6 +219,14 @@ export function GameSettings({
         <Play className="size-5" />
         {isStarting ? 'מתחיל...' : 'התחל משחק'}
       </Button>
+
+      <PlaylistPickerSheet
+        open={isPlaylistPickerOpen}
+        onOpenChange={setIsPlaylistPickerOpen}
+        playlists={playlists}
+        selectedId={playlist.id}
+        onSelect={selectPlaylist}
+      />
     </div>
   )
 }
